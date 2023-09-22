@@ -1,0 +1,115 @@
+---
+- name: Install k8s on cluster nodes
+  hosts: master, workers
+  become: yes
+  tasks:
+    - name: Install docker
+      apt:
+        name: docker.io
+        state: present
+
+    - name: Enable docker services
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Install transport https
+      apt:
+        name: apt-transport-https 
+        state: present
+
+    - name: Install curl
+      apt:
+        name: curl
+        state: present
+
+    - name: Add k8s signing key
+      shell: curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+    
+    - name: Add k8s repo
+      shell: echo "deb https://apt.kubernetes.io/ kubernetes-xenial main" >> ~/kubernetes.list
+
+    - name: Move Files to /etc/apt/source
+      shell: sudo mv ~/kubernetes.list /etc/apt/sources.list.d
+
+    - name: Update nodes
+      shell: sudo apt update
+
+    - name: Install kubelet
+      apt:
+        name: kubelet
+        state: present
+
+    - name: Install kubectl
+      apt:
+        name: kubectl
+        state: present
+    
+    - name: Install kubeadm
+      apt:
+        name: kubeadm
+        state: present
+
+    - name: Install kubernetes-cni
+      apt:
+        name: kubernetes-cni
+        state: present
+
+    - name: Disabling swap memory
+      shell: sudo swapoff -a
+
+    - name: Iptables See Bridged Traffic
+      shell : |
+        lsmod | grep br_netfilter
+        sudo modprobe br_netfilter
+        sudo sysctl net.bridge.bridge-nf-call-iptables=1
+
+    - name: Restart and enable dokcer
+      shell: |
+        sudo systemctl enable docker
+        sudo systemctl daemon-reload
+        sudo systemctl restart docker
+
+    - name: K8s init
+      delegate_to: master
+      shell: sudo kubeadm init --pod-network-cidr=10.244.0.0/16 | tail -2
+      register: joinkey
+
+    - name: Regular user commands
+      delegate_to: master
+      shell: |
+          mkdir -p $HOME/.kube
+          sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+          sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    - name: Deploy a pod network 
+      delegate_to: master
+      shell: |
+          sudo ufw allow 6443
+          sudo ufw allow 6443/tcp
+          kubectl apply -f https://raw.githubusercontent.com/coreos/flannel/master/Documentation/kube-flannel.yml
+        
+    - name: Add worker to master
+      delegate_to: workers
+      shell: sudo {{ joinkey }}
+
+    - name: Get Pods Data
+      delegate_to: master
+      shell: kubectl get pods --all-namespaces
+      register: pods
+
+    - name: Display pods status
+      debug:
+        var: pods
+
+    - name: Get Nodes Data
+      delegate_to: master
+      shell: kubectl get nodes
+      register: nodes
+
+    - name: Display Nodes status
+      debug: 
+        var: nodes
+
+

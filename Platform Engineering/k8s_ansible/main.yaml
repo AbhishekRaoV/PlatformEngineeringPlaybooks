@@ -1,0 +1,69 @@
+---
+- name: Install k8s on cluster nodes
+  hosts: master, workers
+  become: yes
+  tasks:
+    - name: Install docker
+      apt:
+        name: docker.io
+        state: latest
+
+    - name: Enable docker services
+      systemd:
+        name: docker
+        enabled: yes
+        state: started
+
+    - name: Install transport https
+      apt:
+        name: apt-transport-https 
+        state: present
+
+    - name: Install curl
+      apt:
+        name: curl
+        state: present
+
+    - name: Add k8s signing key
+      shell: curl -s https://packages.cloud.google.com/apt/doc/apt-key.gpg | sudo apt-key add
+    
+    - name: Add k8s repo
+      shell: sudo echo "deb http://apt.kubernetes.io/ kubernetes-xenial main" > /etc/apt/sources.list.d/kubernetes.list
+    
+    - name: Update nodes
+      shell: sudo apt update
+
+    - name: Install kubelet
+      apt:
+        name: kubelet
+        state: present
+
+    - name: Install kubectl
+      apt:
+        name: kubectl
+        state: present
+    
+    - name: Install kubeadm
+      apt:
+        name: kubeadm
+        state: present
+
+    - name: Install kubernetes-cni
+      apt:
+        name: kubernetes-cni
+        state: present
+
+    - name: Disabling swap memory
+      shell: sudo swapoff -a
+
+    - name: Intialising k8s
+      shell: sudo kubeadm init
+
+    - name: Config Files
+      shell: |
+          mkdir -p $HOME/.kube
+          sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+          sudo chown $(id -u):$(id -g) $HOME/.kube/config
+
+    - name: Make nodes & pods ready
+      shell: kubectl apply -f https://docs.projectcalico.org/v3.8/manifests/calico.yaml
