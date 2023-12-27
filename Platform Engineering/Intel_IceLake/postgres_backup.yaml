@@ -1,0 +1,35 @@
+---
+- name: Backup DB
+  hosts: postgres
+  become: true
+  tasks:
+    - name: Source .bash_profile
+      become_user: postgres
+      shell: source .bash_profile
+
+    - name: Stop db
+      become_user: postgres
+      shell: pg_ctl -D $PGDATA stop
+      register: stop_db-status
+
+    - name: Display status
+      become_user: postgres
+      debug:
+        var: stop_db-status
+
+    - name: Copy move and link files
+      become_user: postgres
+      shell: |
+          cp -R $PGDATA /var/lib/postgresql/14/backups
+          mv $PGDATA/pg_wal /var/lib/postgresql/14/log
+          ln -s /var/lib/postgresql/14/log/pg_wal $PGDATA/pg_wal
+      
+    - name: start db
+      become_user: postgres
+      shell: pg_ctl -D $PGDATA start
+      register: start_dbs_status
+
+    - name: Display status
+      become_user: postgres
+      debug:
+       var: start_dbs_status

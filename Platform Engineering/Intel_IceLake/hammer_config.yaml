@@ -1,0 +1,21 @@
+---
+- name: Setup and configure HammerDB
+  hosts: hammer
+  become: true
+  tasks:
+    - name: Change to HammerDB directory
+      command: chdir=HammerDB-4.1
+               cmd=unset LD_LIBRARY_PATH
+               cmd=export LD_LIBRARY_PATH=/usr/lib/postgresql/14/lib
+               cmd=./hammerdbcli
+      ignore_errors: true
+
+    - name: Set HammerDB database parameters
+      command: chdir=HammerDB-4.1
+               cmd=./hammerdbcli -t "dbset db pg; dbset bm tpc-c; diset connection pg_host {{ postgres_ip }}; diset tpcc pg_count_ware 2; diset tpcc pg_num_vu 2; diset tpcc pg_superuserpass admin; buildschema; vudestroy"
+      ignore_errors: true
+      register: setup_op
+
+    - name: Display setup op 
+      debug:
+        var: setup_op

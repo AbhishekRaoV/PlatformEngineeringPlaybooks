@@ -1,0 +1,90 @@
+---
+- name: DB Configuration
+  hosts: postgres
+  become: true
+  tasks:
+    - name: Create directory
+      file:
+        path: {{ item }}
+        state: directory
+      loop:
+        - /var/lib/postgresql/14/log
+        - /var/lib/postgresql/14/backups
+       
+    - name: give permissions
+      file:
+        path: /var/lib/postgresql
+        owner: postgres
+        group: postgres
+        recurse: yes
+
+    - name: Insert enivronment variables
+      become_user: postgres
+      copy:
+        content: |
+            PGDATA=/var/lib/postgresql/14/main
+            export PGDATA
+            PATH=$PATH:$HOME:/usr/bin:/usr/local/bin:/usr/lib/postgresql/14/bin
+            export PATH
+            LD_LIBRARY_PATH=/usr/lib/postgresql/14/lib
+            export LD_LIBRARY_PATH
+        dest: .bash_profile
+      remote_src: yes
+    
+    - name: source and init DB
+      become_user: postgres
+      shell: source .bash_profile && initdb -D $PGDATA
+      register: init_db_status
+
+    - name: Display status
+      become_user: postgres
+      debug:
+        var: init_db_status.stdout_lines
+    
+    - name: Insert to /etc/sysctl.conf file
+      lineinfile:
+        line: "vm.nr_hugepages = 10"
+        dest: /etc/sysctl.conf
+        insertafter: EOF
+      remote_src: yes
+    
+    - name: Reboot machine
+      shell: reboot
+      async: 0
+      poll: 0
+
+    - name: Wait for host to reboot
+      wait_for_connection:
+        timeout: 300
+
+    - name: Edit pg_hba.conf file in $PGDATA
+      become_user: postgres
+      lineinfile:
+        line: "host    all    all    {{ hammer_ip }}/32    trust"
+        dest: $PGDATA/pg_hba.conf
+        insertafter: EOF
+      remote_src: yes
+
+    - name: Edit postgres.conf
+      become_user: postgres
+      lineinfile:
+        line: |
+          "listen_addresses= '{{ postgres_ip }}
+           port = 5432 "
+        dest: $PGDATA/postgres.conf
+      remote_src: yes
+
+    - name: Start DB 
+      become_user: postgres
+      shell: pg_ctl -D $PGDATA start
+      register: start_db_status
+
+    - name: Display status
+      debug:
+        var: start_db_status.stdout_lines
+
+    
+
+
+
+
