@@ -1,6 +1,6 @@
 ---
 - name: Install jenkins in cluster nodes
-  hosts: cluster_nodes
+  hosts: localhost
   tasks:
     - name: Update nodes
       become: true
@@ -17,11 +17,11 @@
           - openjdk-17-jre
 
     - name: Get jenkins packages
-      shell : curl -fsSL https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key | sudo tee \
-              /usr/share/keyrings/jenkins-keyring.asc > /dev/null
+      shell : sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+              https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
 
     - name: Sign packages
-      shell : echo deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] \
+      shell : echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
               https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
               /etc/apt/sources.list.d/jenkins.list > /dev/null
 
