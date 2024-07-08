@@ -1,6 +1,6 @@
 ---
   - name: Install Prometheus on cluster nodes
-    hosts: cluster_nodes
+    hosts: localhost
     tasks:
       - name: update nodes
         become: true
